@@ -48,7 +48,7 @@ install_packages() {
   fi
 
   # install PIP3 packages
-  [-n "$PACKAGES_PIP" ] && pip3 --disable-pip-version-check install $PACKAGES_PIP
+  [ -n "$PACKAGES_PIP" ] && pip3 --disable-pip-version-check install $PACKAGES_PIP
 }
 
 # --- install specific files   ----------------------------------------------
