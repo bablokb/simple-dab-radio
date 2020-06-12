@@ -168,12 +168,13 @@ class Radio(object):
 if __name__ == "__main__":
 
   if len(sys.argv) < 2:
-    print("usage: %s station-file" % sys.argv[0])
-    sys.exit(3)
+    station_file = os.path.expanduser("~/stations.json")
+  else:
+    station_file = sys.argv[1]
 
   try:
     radio = Radio()
-    radio.read_stations(sys.argv[1])
+    radio.read_stations(station_file)
     radio.read_settings()
     radio.start()
     radio.update_volume()
