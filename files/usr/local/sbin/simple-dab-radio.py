@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 
-import evdev, select, json, os, sys, traceback, pprint, subprocess, shlex
+import evdev, signal, select, json, os, sys, traceback, pprint, subprocess, shlex
 
 # --- application-class   ----------------------------------------------------
 
@@ -29,7 +29,7 @@ class Radio(object):
     """ start (boot) the radio """
 
     rc = subprocess.call([Radio._RADIO_CLI,"-b","D"])
-    print("return-code: %d" % rc)
+    print("start return-code: %d" % rc)
     
   # --- stop radio   --------------------------------------------------------
 
@@ -37,7 +37,7 @@ class Radio(object):
     """ stop the radio """
 
     rc = subprocess.call([Radio._RADIO_CLI,"-k"])
-    print("return-code: %d" % rc)
+    print("stop return-code: %d" % rc)
     
   # --- read settings   ------------------------------------------------------
 
@@ -64,6 +64,7 @@ class Radio(object):
       }
 
     sname = os.path.expanduser('~/.simple-dab-radio.json')
+    print("saving settings to: %s" % sname)
     with open(sname,"w") as f:
       json.dump(settings,f,indent=2)
 
@@ -109,7 +110,7 @@ class Radio(object):
     print("updating volume to %d" % vol)
     args = shlex.split(Radio._CMD_VOLUME.format(vol))
     rc = subprocess.call(args)
-    print("return-code: %d" % rc)
+    print("update_volume return-code: %d" % rc)
 
   # --- change station   -----------------------------------------------------
 
@@ -128,7 +129,7 @@ class Radio(object):
                               station["srvid"],
                               station["tune_idx"]))
     rc = subprocess.call(args)
-    print("return-code: %d" % rc)
+    print("update_tuner return-code: %d" % rc)
 
   # --- process events from rotary-encoder   ---------------------------------
 
@@ -165,12 +166,27 @@ class Radio(object):
 
 # --------------------------------------------------------------------------
 
+def signal_handler(_signo, _stack_frame):
+  """ Signal-handler to cleanup threads """
+
+  global radio
+  radio.done = True
+  radio.stop()
+  radio.save_settings()
+  sys.exit(0)
+
+# --------------------------------------------------------------------------
+
 if __name__ == "__main__":
 
   if len(sys.argv) < 2:
     station_file = os.path.expanduser("~/stations.json")
   else:
     station_file = sys.argv[1]
+
+  # setup signal handlers
+  signal.signal(signal.SIGTERM, signal_handler)
+  signal.signal(signal.SIGINT, signal_handler)
 
   try:
     radio = Radio()
@@ -181,7 +197,8 @@ if __name__ == "__main__":
     radio.update_tuner()
     radio.process_events()
   except:
-    print(traceback.format_exc())
-    radio.done = True
+    if not radio.done:
+      print(traceback.format_exc())
+      radio.done = True
     radio.stop()
     radio.save_settings()
