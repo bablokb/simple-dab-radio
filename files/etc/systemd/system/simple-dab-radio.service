@@ -1,0 +1,23 @@
+# --------------------------------------------------------------------------
+# Systemd service Definition for simple-dab-radio.service.
+#
+# The service starts the script /usr/local/sbin/simple-dab-radio.service
+#
+# Author: Bernhard Bablok
+# License: GPL3
+#
+# Website: https://github.com/bablokb/simple-dab-radio
+#
+# --------------------------------------------------------------------------
+
+[Unit]
+Description=Simple DAB+ Radio
+After=multi-user.target
+ 
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/simple-dab-radio.py
+ExecStop=/usr/local/sbin/radio_cli -k
+
+[Install]
+WantedBy=multi-user.target
