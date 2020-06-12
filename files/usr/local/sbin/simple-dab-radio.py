@@ -28,7 +28,7 @@ class Radio(object):
   def start(self):
     """ start (boot) the radio """
 
-    rc = subprocess.call([Radio._RADIO_CLI,"-b","D"])
+    rc = subprocess.call([Radio._RADIO_CLI,"-b","D","-o",self._i2s])
     print("start return-code: %d" % rc)
     
   # --- stop radio   --------------------------------------------------------
@@ -52,6 +52,12 @@ class Radio(object):
     else:
       self._value = [25,0]      # [volume,station]
 
+    # check i2s-attribute
+    if "i2s" in settings:
+      self._i2s = settings['i2s']
+    else:
+      self._i2s      = "0"
+
   # --- save settings   ------------------------------------------------------
 
   def save_settings(self):
@@ -60,7 +66,8 @@ class Radio(object):
     settings = {
       'volume':  self._value[0],
       'station': self._value[1],
-      'name': self._stations[self._value[1]]["label"]  # only informational
+      'name': self._stations[self._value[1]]["label"],  # only informational
+      'i2s': self._i2s
       }
 
     sname = os.path.expanduser('~/.simple-dab-radio.json')
