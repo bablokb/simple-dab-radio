@@ -28,7 +28,7 @@ class Radio(object):
   def start(self):
     """ start (boot) the radio """
 
-    rc = subprocess.call([Radio._RADIO_CLI,"-b","D","-o",self._i2s])
+    rc = subprocess.call([Radio._RADIO_CLI,"-b","D","-o",str(self._i2s)])
     print("start return-code: %d" % rc)
     
   # --- stop radio   --------------------------------------------------------
@@ -38,6 +38,10 @@ class Radio(object):
 
     rc = subprocess.call([Radio._RADIO_CLI,"-k"])
     print("stop return-code: %d" % rc)
+    self.done = True
+    self.save_settings()
+    if self._i2s_pid is not None and self._i2s_pid.poll():
+      self._i2s_pid.kill()
     
   # --- read settings   ------------------------------------------------------
 
@@ -54,9 +58,24 @@ class Radio(object):
 
     # check i2s-attribute
     if "i2s" in settings:
-      self._i2s = settings['i2s']
+      self._i2s          = settings['i2s']['active']
+      self._i2s_vol_cmd  = settings['i2s']['vol_cmd']
+      self._i2s_vol_max  = settings['i2s']['vol_max']
+      self._i2s_play_cmd = settings['i2s']['play_cmd']
     else:
-      self._i2s      = "0"
+      self._i2s          = 0
+      self._i2s_vol_cmd  = "amixer -q set PCM {0}%"
+      self._i2s_vol_max  = 100
+      self._i2s_play_cmd = "arecord -D sysdefault:CARD=audiosensepi -c 2 -r 48000 -f S16_LE -q | aplay -q"
+
+    # configure volume-command and playback command
+    if self._i2s:
+      self._cmd_vol  = self._i2s_vol_cmd
+      self._vol_max  = self._i2s_vol_max
+      self._i2s_pid  = None
+    else:
+      self._cmd_vol  = Radio._CMD_VOLUME
+      self._vol_max  = 63
 
   # --- save settings   ------------------------------------------------------
 
@@ -67,7 +86,12 @@ class Radio(object):
       'volume':  self._value[0],
       'station': self._value[1],
       'name': self._stations[self._value[1]]["label"],  # only informational
-      'i2s': self._i2s
+      'i2s': {
+        'active':   self._i2s,
+        'vol_cmd':  self._i2s_vol_cmd,
+        'vol_max':  self._i2s_vol_max,
+        'play_cmd': self._i2s_play_cmd
+        }
       }
 
     sname = os.path.expanduser('~/.simple-dab-radio.json')
@@ -108,14 +132,14 @@ class Radio(object):
   def update_volume(self):
     """ update volume """
 
-    # clamp volume to 0-63
+    # clamp volume to 0-vol_max
     vol = self._value[Radio._STATE_VOLUME]
-    vol = min(vol,63)
+    vol = min(vol,self._vol_max)
     vol = max(vol,0)
     self._value[Radio._STATE_VOLUME] = vol
     
     print("updating volume to %d" % vol)
-    args = shlex.split(Radio._CMD_VOLUME.format(vol))
+    args = shlex.split(self._cmd_vol.format(vol))
     rc = subprocess.call(args)
     print("update_volume return-code: %d" % rc)
 
@@ -123,6 +147,14 @@ class Radio(object):
 
   def update_tuner(self):
     """ update station """
+
+    if self._i2s and  (
+      self._i2s_pid is None or self._i2s_pid.poll() is not None):
+      # and start playing
+      args = shlex.split(self._i2s_play_cmd)
+      args=self._i2s_play_cmd
+      print("starting to play with %r",(args,))
+      self._i2s_pid = subprocess.Popen(args,shell=True)
 
     # wrap around
     idx = self._value[Radio._STATE_TUNER]
@@ -177,9 +209,7 @@ def signal_handler(_signo, _stack_frame):
   """ Signal-handler to cleanup threads """
 
   global radio
-  radio.done = True
   radio.stop()
-  radio.save_settings()
   sys.exit(0)
 
 # --------------------------------------------------------------------------
@@ -206,6 +236,4 @@ if __name__ == "__main__":
   except:
     if not radio.done:
       print(traceback.format_exc())
-      radio.done = True
     radio.stop()
-    radio.save_settings()
