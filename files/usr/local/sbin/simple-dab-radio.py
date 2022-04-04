@@ -152,7 +152,6 @@ class Radio(object):
       self._i2s_pid is None or self._i2s_pid.poll() is not None):
       # and start playing
       args = shlex.split(self._i2s_play_cmd)
-      args=self._i2s_play_cmd
       print("starting to play with %r",(args,))
       self._i2s_pid = subprocess.Popen(args,shell=True)
 
